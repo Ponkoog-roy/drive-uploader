@@ -7,8 +7,11 @@ class UploadedVideo(Base):
 
     id = Column(Integer, primary_key=True, index=True)
 
-    file_name = Column(String, unique=True)
+    file_name = Column(String, nullable=False)
+    file_path = Column(String, nullable=False)
 
-    file_path = Column(String)
+    file_hash = Column(String, unique=True, nullable=True)
 
-    drive_file_id = Column(String)
+    drive_file_id = Column(String, nullable=True)
+
+    status = Column(String, default="pending")
