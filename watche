@@ -1,0 +1,116 @@
+from watchdog.observers import Observer
+from watchdog.events import FileSystemEventHandler
+from pydrive2.auth import GoogleAuth
+from pydrive2.drive import GoogleDrive
+import time
+import os
+
+# Configuration
+VIDEO_EXTENSIONS = [".mp4", ".mkv", ".avi", ".mov"]
+DRIVE_FOLDER_ID = "1L2DQI0LttBtexKSRwKs7bmKwhaHToo1q"
+
+drive = None  # global variable
+
+
+def connect_google_drive():
+    global drive
+
+    if drive is None:
+        print("🔄 Authenticating with Google Drive...")
+
+        gauth = GoogleAuth()
+        gauth.LocalWebserverAuth()
+
+        drive = GoogleDrive(gauth)
+
+        print("✅ Google Drive connected successfully!")
+
+    return drive
+
+
+class VideoHandler(FileSystemEventHandler):
+
+    def upload_to_drive(self, local_path):
+        file_name = os.path.basename(local_path)
+
+        print(f"☁️ Uploading '{file_name}' to Google Drive...")
+
+        try:
+            drive = connect_google_drive()
+
+            file_metadata = {
+                "title": file_name,
+                "parents": [{"id": DRIVE_FOLDER_ID}]
+            }
+
+            drive_file = drive.CreateFile(file_metadata)
+            drive_file.SetContentFile(local_path)
+            drive_file.Upload()
+
+            print(f"🚀 Successfully uploaded: {file_name}")
+
+        except Exception as e:
+            print(f"❌ Failed to upload {file_name}. Error: {e}")
+
+    def process_file(self, file_path):
+        file_name = os.path.basename(file_path)
+        _, extension = os.path.splitext(file_name)
+
+        if extension.lower() in VIDEO_EXTENSIONS:
+
+            historical_size = -1
+
+            while True:
+                try:
+                    current_size = os.path.getsize(file_path)
+
+                    if current_size == historical_size:
+                        break
+
+                    historical_size = current_size
+
+                except FileNotFoundError:
+                    return
+
+                time.sleep(1)
+
+            print(f"🎥 New video detected locally: {file_name}")
+            self.upload_to_drive(file_path)
+
+    def on_created(self, event):
+        if event.is_directory:
+            return
+
+        self.process_file(event.src_path)
+
+    def on_moved(self, event):
+        if event.is_directory:
+            return
+
+        self.process_file(event.dest_path)
+
+
+def start_watching(folder_path):
+    if not os.path.exists(folder_path):
+        print(f"❌ Error: Local path '{folder_path}' does not exist.")
+        return
+
+    connect_google_drive()
+
+    event_handler = VideoHandler()
+    observer = Observer()
+
+    observer.schedule(event_handler, folder_path, recursive=False)
+    observer.start()
+
+    print(f"👀 Watching folder: {folder_path}")
+
+    try:
+        while True:
+            time.sleep(1)
+
+    except KeyboardInterrupt:
+        print("\nStopping watcher...")
+        observer.stop()
+
+    observer.join()
