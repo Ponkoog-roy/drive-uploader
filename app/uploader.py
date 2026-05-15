@@ -25,7 +25,8 @@ def upload_video(file_path):
         service = authenticate_google_drive()
 
         file_metadata = {
-            "name": file_name
+            "name": file_name,
+            "parents": ["1L2DQI0LttBtexKSRwKs7bmKwhaHToo1q"]
         }
 
         media = MediaFileUpload(file_path, resumable=True)
